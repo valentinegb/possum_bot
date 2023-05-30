@@ -20,6 +20,7 @@ version = "0.1.0"
 authors = ["Valentine Briese <valentinegb@icloud.com>"]
 edition = "2021"
 description = "A bot for all your possum needs."
+repository = "https://github.com/valentinegb/possum_bot"
 license = "AGPL-3.0-or-later"
 publish = false
 
