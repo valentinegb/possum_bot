@@ -16,6 +16,7 @@
 
 use anyhow::Context as _;
 use poise::serenity_prelude as serenity;
+use poise::serenity_prelude::GuildId;
 use shuttle_poise::ShuttlePoise;
 use shuttle_secrets::SecretStore;
 
@@ -36,6 +37,9 @@ async fn poise(#[shuttle_secrets::Secrets] secret_store: SecretStore) -> Shuttle
     let discord_token = secret_store
         .get("DISCORD_TOKEN")
         .context("'DISCORD_TOKEN' was not found")?;
+    let testing_guild_id = secret_store
+        .get("TESTING_GUILD_ID")
+        .context("'TESTING_GUILD_ID' was not found")?;
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
@@ -46,7 +50,14 @@ async fn poise(#[shuttle_secrets::Secrets] secret_store: SecretStore) -> Shuttle
         .intents(serenity::GatewayIntents::non_privileged())
         .setup(|ctx, _ready, framework| {
             Box::pin(async move {
-                poise::builtins::register_globally(ctx, &framework.options().commands).await?;
+                // poise::builtins::register_globally(ctx, &framework.options().commands).await?;
+                poise::builtins::register_in_guild(
+                    ctx,
+                    &framework.options().commands,
+                    GuildId(testing_guild_id.parse()?),
+                )
+                .await?;
+
                 Ok(Data {})
             })
         })
