@@ -34,3 +34,5 @@ shuttle-poise = "0.17.0"
 shuttle-secrets = "0.17.0"
 tokio = "1.28.2"
 tracing = "0.1.37"
+shuttle-shared-db = { version = "0.17.0", features = ["postgres"] }
+sqlx = { version = "0.6.3", features = ["runtime-tokio-native-tls", "postgres"] }

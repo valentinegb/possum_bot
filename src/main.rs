@@ -16,11 +16,15 @@
 
 use anyhow::Context as _;
 use poise::serenity_prelude as serenity;
-use poise::serenity_prelude::GuildId;
+use poise::serenity_prelude::{Attachment, AttachmentType, GuildId};
 use shuttle_poise::ShuttlePoise;
 use shuttle_secrets::SecretStore;
+use sqlx::{Executor, PgPool, Row};
+use std::borrow::Cow;
 
-struct Data {} // User data, which is stored and accessible in all command invocations
+struct Data {
+    pool: PgPool,
+} // User data, which is stored and accessible in all command invocations
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
 
@@ -31,12 +35,63 @@ type Context<'a> = poise::Context<'a, Data, Error>;
     description_localized("en-GB", "Responds with a random opossum picture.")
 )]
 async fn possum(ctx: Context<'_>) -> Result<(), Error> {
-    ctx.say("Placeholder").await?;
+    ctx.defer().await?;
+
+    let image = ctx
+        .data()
+        .pool
+        .fetch_one("SELECT id, image_data, attribution FROM approved ORDER BY RANDOM() LIMIT 1;")
+        .await?;
+
+    ctx.send(|reply| {
+        reply
+            .content(image.get::<String, &str>("attribution"))
+            .attachment(AttachmentType::Bytes {
+                data: Cow::from(image.get::<&[u8], &str>("image_data")),
+                filename: format!("possum-bot-image-{}", image.get::<String, &str>("id")),
+            })
+    })
+    .await?;
+
+    Ok(())
+}
+
+/// Submits an image for review to be added to the images the bot can return.
+#[poise::command(slash_command)]
+async fn submit(
+    ctx: Context<'_>,
+    #[description = "The image to submit."] image: Attachment,
+) -> Result<(), Error> {
+    ctx.defer_ephemeral().await?;
+
+    ctx.say(image.content_type.unwrap_or("None".to_string()))
+        .await?;
+
     Ok(())
 }
 
 #[shuttle_runtime::main]
-async fn poise(#[shuttle_secrets::Secrets] secret_store: SecretStore) -> ShuttlePoise<Data, Error> {
+async fn poise(
+    #[shuttle_secrets::Secrets] secret_store: SecretStore,
+    #[shuttle_shared_db::Postgres] pool: PgPool,
+) -> ShuttlePoise<Data, Error> {
+    pool.execute(include_str!("../schema.sql"))
+        .await
+        .map_err(shuttle_runtime::CustomError::new)?;
+
+    // let image_hex = include_bytes!("Didelphis_virginiana_with_young.JPG")
+    //     .map(|byte| format!("{:02X?}", byte))
+    //     .join("");
+    //
+    // debug!(image_hex);
+    //
+    // pool.execute(format!(
+    //     "INSERT INTO approved (image_data, attribution) VALUES ('\\x{}', 'Specialjake, CC BY-SA 3.0 <https://creativecommons.org/licenses/by-sa/3.0>, via Wikimedia Commons');",
+    //     image_hex,
+    // ).as_str())
+    // .await
+    // .map_err(shuttle_runtime::CustomError::new)?;
+
     // Get the discord token set in `Secrets.toml`
     let discord_token = secret_store
         .get("DISCORD_TOKEN")
@@ -63,7 +118,7 @@ async fn poise(#[shuttle_secrets::Secrets] secret_store: SecretStore) -> Shuttle
                 )
                 .await?;
 
-                Ok(Data {})
+                Ok(Data { pool })
             })
         })
         .build()
