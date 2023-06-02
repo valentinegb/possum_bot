@@ -15,3 +15,9 @@ target/
 
 # shuttle.rs secrets
 Secrets.toml
+
+# Custom macOS folder attributes
+.DS_Store
+
+# JetBrains IntelliJ IDEA specific project files
+.idea
